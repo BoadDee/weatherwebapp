@@ -1,0 +1,78 @@
+name: react-ci
+
+on:
+  push:
+    branches:
+      - main
+      - feature/*
+    paths:
+      - "node_modules/**"
+  workflow_dispatch:
+  pull_request:
+    branches:
+      - main
+permissions:
+  contents: read
+  pull-requests: write
+  id-token: write
+  issues: write
+  checks: write
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      # - name: install SQLite3
+      #   run: |
+      #     pip install pysqlite3-binary
+      #     sqlite3 --version
+
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: '14'
+
+      - name: Access npm cache
+        uses: actions/cache@v4
+        id: cache-npm
+        with:
+          path: ${{github.workspace}}/node_modules
+          key: npmpackage | ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+          #key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+
+      - name: Install dependencies
+        if: steps.cache-npm.outputs.cache-hit != 'true'
+        run: npm ci
+        working-directory: ${{github.workspace}}/node_modules
+
+      - name: Build
+        run: npm run build
+        working-directory: ${{github.workspace}}/node_modules
+
+      - name: Zip artifact for deployment
+        run: zip -r ${{github.workspace}}/webApp.zip ${{github.workspace}}/node_modules/build
+        # working-directory: ${{github.workspace}}/build
+
+      - name: Upload artifact for deployment job
+        uses: actions/upload-artifact@v3
+        with:
+          name: webAppcode
+          path: ${{github.workspace}}/webApp.zip
+        
+
+  deploy_de:
+    uses: ./.github/workflows/deploytemp.yml
+    needs: build
+    with:
+      environment: de
+      artifactName: webAppcode
+      webAppName: dare-web-app
+    secrets:
+      AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+      AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+      AZURE_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      AZURE_WEBAPP_PUBLISH_PROFILE: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}

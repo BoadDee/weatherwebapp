@@ -1,0 +1,65 @@
+name: react-deploy-template
+
+on:
+  workflow_call:
+    inputs:
+      environment:
+        required: true
+        type: string
+        description: 'The environment to deploy to'
+      artifactName:
+        required: true
+        type: string
+        description: 'The name of the artifact to deploy'
+      webAppName:
+        required: true
+        type: string
+        description: 'The name of the web app to deploy to'
+      
+    secrets:
+      AZURE_CLIENT_ID:
+        required: true
+      AZURE_TENANT_ID:
+        required: true
+      AZURE_SUBSCRIPTION_ID:
+        required: true
+      AZURE_WEBAPP_PUBLISH_PROFILE:
+        required: true
+
+permissions:
+  id-token: write
+  contents: read
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Download artifact
+        uses: actions/download-artifact@v2
+        with:
+          name: ${{ inputs.artifactName }}
+          #path: ${{github.workspace}}
+
+      - name: Unzip artifact
+        run: unzip webApp.zip -d ${{github.workspace}}/artifact
+        #run: unzip build.buildnumber.zip -d ${{github.workspace}}/artifact/${{ inputs.artifactName }}
+      #   #run: unzip ${{github.workspace}}/build.buildnumber.zip -d ${{github.workspace}}/artifact
+
+      - name: azure Login
+        uses: azure/login@v1
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          enable-AzPSSession: true
+
+      - name: Deploy to Azure
+        uses: azure/webapps-deploy@v2
+        with:
+          app-name: ${{ inputs.webAppName }}
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          package: ${{github.workspace}}/artifact
