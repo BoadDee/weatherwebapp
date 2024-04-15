@@ -3,6 +3,7 @@ name: react-ci
 on:
   push:
     branches:
+      - master
       - main
       - feature/*
     paths:
